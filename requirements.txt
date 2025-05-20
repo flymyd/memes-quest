@@ -3,4 +3,7 @@ uvicorn[standard]
 pymilvus
 openai
 python-dotenv
+requests
+gunicorn
+watchfiles
 aiofiles 

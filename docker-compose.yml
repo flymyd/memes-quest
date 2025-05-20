@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: memes-quest-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-11451}:8000"
+    # volumes:
+    #   - ./my_local_images_folder:/app/images
+    environment:
+      PYTHONUNBUFFERED: 1
+      OPENAI_API_KEY: "your_openai_key_here"
+      OPENAI_API_BASE_URL: "http://your_openai_base_url:9997/v1"  
+      IMAGE_DIR: "images" 
+      COLLECTION_NAME: "image_vectors_bge"
+      OPENAI_EMBEDDING_MODEL: "ritrieve_zh_v1"
+      EMBEDDING_DIM: 1792
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# 使用例:
+# docker-compose up --build -d
+# docker-compose down

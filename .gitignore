@@ -1,5 +1,3 @@
 .memes_quest.db.lock
-memes_quest.db
 .env
 __pycache__
-images/

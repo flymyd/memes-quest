@@ -77,3 +77,8 @@
 * 需要安装`Git LFS`以拉取向量数据库
 * 预置表情包：`vv-433张精选表情包`、`一眼丁真-1401张表情包`、`vv电视节目-25287张表情包  `
 * 预置向量数据库：1792维，使用ritrieve_zh_v1进行索引
+
+## 致谢
+* 一眼丁真系列表情包: https://github.com/SleepyAsh0191/yiyandingzhen
+* VV系列精选表情包: https://www.zhihu.com/question/656505859/answer/55843704436
+* VV表情包大全: https://github.com/MemeMeow-Studio/VVfromVideo

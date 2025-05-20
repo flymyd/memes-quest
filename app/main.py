@@ -40,10 +40,10 @@ def construct_image_url(filename: str, request_url_base: str) -> str:
     return f"{base}{IMAGE_DIR}/{filename}"
 
 
-# --- API Endpoints ---
-
 @app.post("/index-images/", summary="Index images from the configured directory")
-async def index_images():
+async def index_images(
+    category: str = Query(None, description="Optional: Specific category (subdirectory in IMAGE_DIR) to index. If not provided, all images in IMAGE_DIR and its subdirectories will be indexed.")
+):
     if not milvus_service:
         raise HTTPException(status_code=503, detail="Milvus service is not available.")
     if not OPENAI_API_KEY:
@@ -51,9 +51,27 @@ async def index_images():
 
     logger.info(f"Starting image indexing process from directory: {IMAGE_DIR}")
     
-    image_files = [f for f in os.listdir(IMAGE_DIR) if os.path.isfile(os.path.join(IMAGE_DIR, f))]
-    if not image_files:
-        return {"message": "No images found in the directory to index."}
+    image_files_to_process = [] # Stores tuples of (full_path, relative_path_for_milvus)
+    
+    base_indexing_path = IMAGE_DIR
+    if category:
+        base_indexing_path = os.path.join(IMAGE_DIR, category)
+        if not os.path.isdir(base_indexing_path):
+            raise HTTPException(status_code=404, detail=f"Category directory '{category}' not found.")
+        logger.info(f"Indexing images for category: {category} in path: {base_indexing_path}")
+    else:
+        logger.info(f"Indexing all images in path: {IMAGE_DIR} and its subdirectories.")
+
+    for root, _, files in os.walk(base_indexing_path):
+        for file in files:
+            # Consider adding more image type checks if necessary
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, IMAGE_DIR)
+                image_files_to_process.append((full_path, relative_path))
+
+    if not image_files_to_process:
+        return {"message": "No images found in the specified path to index."}
 
     indexed_count = 0
     failed_count = 0
@@ -61,18 +79,19 @@ async def index_images():
     filenames_to_index = []
     embeddings_to_index = []
     
-    for filename in image_files:
+    for full_path, relative_path in image_files_to_process:
         try:
-            text_to_embed = os.path.splitext(filename)[0]
+            # Use relative_path for embedding text and for storing in Milvus
+            text_to_embed = os.path.splitext(relative_path)[0] 
             embedding = get_embedding(text_to_embed)
-            filenames_to_index.append(filename)
+            filenames_to_index.append(relative_path) # Store relative path
             embeddings_to_index.append(embedding)
-            logger.info(f"Generated embedding for: {filename}")
+            logger.info(f"Generated embedding for: {relative_path} (from: {full_path})")
         except ValueError as ve:
-            logger.error(f"ValueError for {filename}: {ve}")
+            logger.error(f"ValueError for {relative_path}: {ve}")
             failed_count += 1
         except Exception as e:
-            logger.error(f"Failed to generate embedding for {filename}: {e}")
+            logger.error(f"Failed to generate embedding for {relative_path}: {e}")
             failed_count += 1
             
     if embeddings_to_index:
@@ -87,7 +106,7 @@ async def index_images():
 
 
     return {
-        "message": f"Image indexing complete. Processed {len(image_files)} files.",
+        "message": f"Image indexing complete. Processed {len(image_files_to_process)} files.",
         "indexed_count": indexed_count,
         "failed_count": failed_count,
         "total_in_milvus_after_op": milvus_service.count_entities()
@@ -97,7 +116,8 @@ async def index_images():
 async def search_images(
     request: Request,
     q: str = Query(..., min_length=1, description="Text query to search for images."),
-    n: int = Query(5, gt=0, le=100, description="Number of top matches to return.")
+    n: int = Query(5, gt=0, le=100, description="Number of top matches to return."),
+    category: str = Query(None, description="Optional: Specific category (subdirectory in IMAGE_DIR) to search within.")
 ):
     if not milvus_service:
         raise HTTPException(status_code=503, detail="Milvus service is not available.")
@@ -123,14 +143,22 @@ async def search_images(
     request_url_base = f"{request.url.scheme}://{request.url.netloc}"
 
     image_urls = []
+    filtered_results_count = 0
     for res in search_results:
         file_path = res.get('file_path')
         if file_path:
-            image_urls.append(construct_image_url(file_path, request_url_base))
+            if category:
+                if file_path.startswith(f"{category}{os.path.sep}") or (category == os.path.dirname(file_path) and os.path.sep not in os.path.dirname(file_path)) :
+                    image_urls.append(construct_image_url(file_path, request_url_base))
+                else:
+                    continue 
+            else:
+                image_urls.append(construct_image_url(file_path, request_url_base))
         else:
             logger.warning(f"Search result with ID {res.get('id')} missing file_path.")
-            
-    logger.info(f"Returning {len(image_urls)} search results for query '{q}'.")
+    
+    filtered_results_count = len(image_urls)
+    logger.info(f"Returning {filtered_results_count} search results for query '{q}' (category: {category if category else 'all'}).")
     return {"data": image_urls, "code": 200, "msg": "Success"}
 
 
@@ -165,4 +193,3 @@ async def shutdown_event():
 # To run the app (if this file is executed directly, for development):
 # uvicorn app.main:app --reload
 # Remember to set your OPENAI_API_KEY in your environment or .env file.
-# And have Milvus Lite (or a server) running/configurable. 

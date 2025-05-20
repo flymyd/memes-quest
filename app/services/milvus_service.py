@@ -23,7 +23,7 @@ class MilvusService:
         if not self.client.has_collection(self.collection_name):
             index_params = self.client.prepare_index_params()
             index_params.add_index(
-                field_name="embedding",
+                field_name="embedding", 
                 index_type="IVF_FLAT", # Or "HNSW", "AUTOINDEX"
                 metric_type="L2",
                 params={"nlist": 128} 
@@ -62,11 +62,10 @@ class MilvusService:
     def search_vectors(self, query_vector: list[float], n: int) -> list[dict]:
         if not query_vector:
             raise ValueError("Query vector cannot be empty.")
-        
+
         search_params = {"nprobe": 10}
 
         try:
-
             results = self.client.search(
                 collection_name=self.collection_name,
                 data=[query_vector],
@@ -112,32 +111,3 @@ class MilvusService:
             print(f"Collection '{self.collection_name}' dropped using MilvusClient.")
         except Exception as e:
             print(f"Error dropping collection using MilvusClient: {e}")
-
-# if __name__ == '__main__':
-#     import sys
-#     import os
-#     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-#     from app.core.config import EMBEDDING_DIM, COLLECTION_NAME, MILVUS_URI 
-#     print("Testing MilvusService with MilvusClient...")
-#     try:
-#         milvus_service = MilvusService() 
-#         print(f"Collection '{milvus_service.collection_name}' initial count: {milvus_service.count_entities()} entities.")
-
-#         if milvus_service.count_entities() == 0:
-#             print("Inserting dummy data...")
-#             dummy_vectors = [[np.random.uniform(-1, 1) for _ in range(EMBEDDING_DIM)] for _ in range(2)]
-#             dummy_paths = ["test/image1.jpg", "example/image2.png"]
-#             milvus_service.insert_vectors(dummy_vectors, dummy_paths)
-#             print(f"After insert, collection has {milvus_service.count_entities()} entities.")
-
-#         if milvus_service.count_entities() > 0:
-#             print("Searching...")
-#             query_vec = [np.random.uniform(-0.5, 0.5) for _ in range(EMBEDDING_DIM)]
-#             search_results = milvus_service.search_vectors(query_vec, n=1)
-#             print("Search results raw:", search_results)
-#             if search_results:
-#                 print(f"Found: {search_results[0]['file_path']} with distance {search_results[0]['distance']}")
-#     except Exception as e:
-#         print(f"Error during MilvusService (MilvusClient) test: {e}")
-#     finally:
-#         print("MilvusService (MilvusClient) test finished.") 

@@ -1,6 +1,6 @@
 import os
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
 import logging
@@ -239,7 +239,48 @@ async def search_images(
     
     if single == 1:
         if image_urls:
-            return PlainTextResponse(image_urls[0])
+            first_matching_file_path = None
+            if search_results:
+                if category:
+                    clean_category = category.strip(os.path.sep)
+                    category_prefix_to_match = f"{clean_category}{os.path.sep}" if clean_category else None
+                    if category_prefix_to_match:
+                        for res in search_results:
+                            fp = res.get('file_path')
+                            if fp and fp.startswith(category_prefix_to_match):
+                                first_matching_file_path = fp
+                                break
+                    else:
+                        for res in search_results:
+                            fp = res.get('file_path')
+                            if fp:
+                                first_matching_file_path = fp
+                                break
+                else:
+                    for res in search_results:
+                        fp = res.get('file_path')
+                        if fp:
+                            first_matching_file_path = fp
+                            break
+                
+                if not first_matching_file_path and image_urls:
+                    for res in search_results:
+                        fp = res.get('file_path')
+                        if fp:
+                            first_matching_file_path = fp
+                            break
+
+            if first_matching_file_path:
+                local_image_path = os.path.join(IMAGE_DIR, first_matching_file_path)
+                if os.path.exists(local_image_path):
+                    logger.info(f"Returning image file directly: {local_image_path}")
+                    return FileResponse(local_image_path)
+                else:
+                    logger.error(f"Image file not found at path: {local_image_path} although it was in search results.")
+                    raise HTTPException(status_code=404, detail="图片文件未找到，但曾在搜索结果中。")
+            else:
+                logger.warning("Single mode: No image_urls and no first_matching_file_path found.")
+                raise HTTPException(status_code=404, detail="未找到符合条件的图片。")
         else:
             raise HTTPException(status_code=404, detail="未找到符合条件的图片。")
     else:

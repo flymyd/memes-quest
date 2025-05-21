@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
 import logging
@@ -155,14 +156,18 @@ async def search_images(
     request: Request,
     q: str = Query(..., min_length=1, description="Text query to search for images."),
     n: int = Query(5, gt=0, le=100, description="Number of top matches to return."),
-    category: str = Query(None, description="Optional: Specific category (subdirectory in IMAGE_DIR) to search within.")
+    category: str = Query(None, description="Optional: Specific category (subdirectory in IMAGE_DIR) to search within."),
+    single: int = Query(0, description="如果为1, 则直接返回单个图片URL字符串; 否则返回包含URL列表的对象。")
 ):
     if not milvus_service:
         raise HTTPException(status_code=503, detail="Milvus service is not available.")
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key is not configured.")
 
-    logger.info(f"Received search query: '{q}', n: {n}, category: '{category}'")
+    if single == 1:
+        n = 1 # Force n to 1 if single is 1
+
+    logger.info(f"Received search query: '{q}', n: {n}, category: '{category}', single: {single}")
     try:
         query_embedding = get_embedding(q)
     except ValueError as ve:
@@ -231,7 +236,14 @@ async def search_images(
     
     filtered_results_count = len(image_urls)
     logger.info(f"Returning {filtered_results_count} search results for query '{q}' (category: '{category if category else 'all'}').")
-    return {"data": image_urls, "code": 200, "msg": "Success"}
+    
+    if single == 1:
+        if image_urls:
+            return PlainTextResponse(image_urls[0])
+        else:
+            raise HTTPException(status_code=404, detail="未找到符合条件的图片。")
+    else:
+        return {"data": image_urls, "code": 200, "msg": "Success"}
 
 
 @app.get("/-debug-milvus-count", summary="Get current count of items in Milvus collection (for debugging)")

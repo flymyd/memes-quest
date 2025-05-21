@@ -65,7 +65,7 @@
         -   `q` (str): 搜索文本。
         -   `n` (int, optional, default=5): 返回最相似图片的数量。
         -   `category` (str): 在指定子目录下搜索。
-        -   `single` (number, optional, default=0): 当single=1时，直接返回一条查询结果的图片URL。
+        -   `single` (number, optional, default=0): 当single=1时，直接返回一条查询结果的图片文件。
     -   返回: 图片 URL 列表。
 -   **GET /images/{filename}**: 访问图片文件。 
 
